@@ -85,7 +85,8 @@ const parseCSV = (text) => {
         // 1. CSV解析ロジック
         for (let j = 0; j < lines[i].length; j++) {
             if (lines[i][j] === '"') inQuote = !inQuote;
-            else if (lines[i][j] === ',' && !inQuote) {
+            // 🚨 修正2: 不要なエスケープ文字を削除するため、このロジックは問題なし
+            else if (lines[i][j] === ',' && !inQuote) { 
                 values.push(lines[i].substring(start, j).replace(/"/g, '').trim());
                 start = j + 1;
             }
@@ -262,8 +263,10 @@ export default function CertificateApp() {
             if (stored) {
                 try {
                     if (key === 'csvDataList') return JSON.parse(stored);
+                    // builderNameを個別に保存するロジックは削除したため、backPageListText以外の文字列データはそのまま返す
                     if (key !== 'backPageListText') return stored; 
                 } catch {
+                    // JSONパースエラーの場合や、文字列データの場合
                     return stored;
                 }
             }
@@ -371,6 +374,7 @@ export default function CertificateApp() {
         }
     }, []);
     
+    // 🚨 修正1: updatePropertyStatus を依存配列に追加しました
     // 💡 既存: バッチ印刷制御のためのuseEffect
     useEffect(() => {
         
@@ -432,7 +436,7 @@ export default function CertificateApp() {
 
             return () => clearTimeout(printTimer);
         }
-    }, [batchPrintIndex, isBatchPrinting, csvDataList]); // 依存関係は必要なもののみ
+    }, [batchPrintIndex, isBatchPrinting, csvDataList, updatePropertyStatus]); // 👈 updatePropertyStatus を追加しました
 
     // 🏆 新規: メインアプリのロック解除ハンドラ
     const handleMainUnlock = () => {
@@ -528,7 +532,7 @@ export default function CertificateApp() {
         if (currentData.propertyNo === propertyNo && !isBatchPrinting) {
             setCurrentData(d => ({ ...d, [key]: value }));
         }
-    }, [currentData, isBatchPrinting]);
+    }, [currentData, isBatchPrinting]); // 依存配列は変更なし
 
     const handleTempChange = useCallback((key, value) => {
         setTempData(prev => ({ ...prev, [key]: value }));
