@@ -206,9 +206,12 @@ const FieldRow = memo(({ label, value, fieldKey, onChange, placeholder = '', cla
     const handleInputChange = (e) => {
         setInputValue(e.target.value); // ローカルの状態は常に即座に更新し、スムーズな入力を実現
         
-        // IME入力中でない場合のみ、親の状態を更新する
-        if (isModal && !isComposing && onChange && fieldKey) {
-            onChange(fieldKey, e.target.value);
+        // 🚀 修正: isModalかつonChangeが存在する場合のみ、親の状態を更新する
+        if (isModal && onChange && fieldKey) {
+            // IME入力中でない場合のみ、親の状態を更新する
+            if (!isComposing) {
+                 onChange(fieldKey, e.target.value);
+            }
         }
     };
 
@@ -219,8 +222,9 @@ const FieldRow = memo(({ label, value, fieldKey, onChange, placeholder = '', cla
     const handleCompositionEnd = (e) => {
         setIsComposing(false);
         
-        // 変換が終了した時点で、親の状態を最終値で更新する
+        // 🚀 修正: isModalかつonChangeが存在する場合のみ
         if (isModal && onChange && fieldKey) {
+            // 変換が終了した時点で、親の状態を最終値で更新する
             onChange(fieldKey, e.target.value);
         }
     };
@@ -370,6 +374,17 @@ export default function CertificateApp() {
             document.title = '証明書発行アプリ';
         }
     }, []);
+
+    // 状態更新関数をuseCallbackでラップし、安定性を向上 (useEffectで使用するため)
+    const updatePropertyStatus = useCallback((propertyNo, key, value) => {
+        if (!propertyNo) return;
+        setCsvDataList(list => list.map(d => d.propertyNo === propertyNo ? { ...d, [key]: value } : d));
+        // バッチ印刷中ではない場合のみ、currentDataも更新
+        // 🚀 修正: currentData.propertyNo === propertyNo のチェックを追加
+        if (currentData.propertyNo === propertyNo && !isBatchPrinting) {
+            setCurrentData(d => ({ ...d, [key]: value }));
+        }
+    }, [currentData, isBatchPrinting]);
     
     // 💡 既存: バッチ印刷制御のためのuseEffect
     useEffect(() => {
@@ -425,7 +440,9 @@ export default function CertificateApp() {
                 setTimeout(() => { document.title = originalTitle; }, 100);
 
                 // 3. 印刷後処理
-                updatePropertyStatus(dataToPrint.propertyNo, 'isPrinted', true);
+                // updatePropertyStatus内で currentData.propertyNo が変わっている可能性があるため、
+                // dataToPrint.propertyNo を使用
+                updatePropertyStatus(dataToPrint.propertyNo, 'isPrinted', true); 
                 setBatchPrintIndex(prev => prev + 1); // indexをインクリメントし、次のサイクルをトリガー
                 
             }, 50); // 50msの短い遅延
@@ -520,16 +537,6 @@ export default function CertificateApp() {
         }
     };
     
-    // 状態更新関数をuseCallbackでラップし、安定性を向上 (useEffectで使用するため)
-    const updatePropertyStatus = useCallback((propertyNo, key, value) => {
-        if (!propertyNo) return;
-        setCsvDataList(list => list.map(d => d.propertyNo === propertyNo ? { ...d, [key]: value } : d));
-        // バッチ印刷中ではない場合のみ、currentDataも更新
-        if (currentData.propertyNo === propertyNo && !isBatchPrinting) {
-            setCurrentData(d => ({ ...d, [key]: value }));
-        }
-    }, [currentData, isBatchPrinting]);
-
     const handleTempChange = useCallback((key, value) => {
         setTempData(prev => ({ ...prev, [key]: value }));
     }, []);
@@ -691,7 +698,7 @@ export default function CertificateApp() {
         
         items.forEach(line => {
             // 1) または 1）で始まる行を検出
-            const match = line.match(/^(\d+)\s*[）)]\s*(.*)/); // ⚠️ 修正箇所: \を削除
+            const match = line.match(/^(\d+)\s*[）)]\s*(.*)/); // ⚠️ 修正箇所: \を削除 (ビルドエラー対応)
             // 例：で始まる行を検出
             const isExample = line.trim().startsWith('例：'); 
             
@@ -762,7 +769,7 @@ export default function CertificateApp() {
                         <FieldRow label="物件No" value={tempData.propertyNo || ''} fieldKey="propertyNo" onChange={handleTempChange} isModal={true} placeholder="物件番号を入力"/>
                         <FieldRow label="物件名" value={tempData.propertyName || ''} fieldKey="propertyName" onChange={handleTempChange} isModal={true} placeholder="物件名を入力"/>
                         <FieldRow label="所在地" value={tempData.propertyLocation || ''} fieldKey="propertyLocation" onChange={handleTempChange} isModal={true} placeholder="物件の所在地を入力"/>
-                        {/* 💡 修正: tempDataからbuilderNameを取得 */}
+                        {/* 💡 ビルダー様名 */}
                         <FieldRow label="ビルダー様名" value={tempData.builderName || ''} fieldKey="builderName" onChange={handleTempChange} isModal={true} placeholder="ビルダー名を入力"/>
                         <FieldRow label="施工日" value={tempData.constructionDate || ''} fieldKey="constructionDate" onChange={handleTempChange} isModal={true} placeholder="例: 2024年01月23日"/>
                     </div>
@@ -1281,8 +1288,8 @@ export default function CertificateApp() {
 
                             <h2 className="text-xl font-extrabold mb-4 text-center tracking-wider text-red-800 print:text-lg">免 責 事 項</h2>
                             
-                            <p className="text-sm font-bold mb-4 border-b pb-2 border-red-200 print:text-xs print:mb-2">
-                                以下のいずれかに該当する場合には、保証は適用されません。
+                            <p className="text-sm font-bold mb-4 border-b pb-2 border-red-200 print:text-xs print:mb-2">\
+                                以下のいずれかに該当する場合には、保証は適用されません。\
                             </p>
                             
                             {renderBackPageList(backPageListText)}
