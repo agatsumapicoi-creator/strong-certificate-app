@@ -1,10 +1,10 @@
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
-import { Printer, FileText, Upload, List, ChevronRight, CheckSquare, Square, Trash2, Edit, X } from 'lucide-react';
+import { Printer, FileText, Upload, List, ChevronRight, CheckSquare, Square, Trash2, Edit, X, Settings } from 'lucide-react';
 
 // Tailwind CSSを前提としています
 
-// 💡 支店コードと支店名のマッピング
-const BRANCH_MAP = {
+// 💡 支店コードと支店名の初期マッピング (定数として定義)
+const BRANCH_MAP_INITIAL = {
     '001': '札幌支店', '101': '青森支店', '102': '八戸営業所', '111': '盛岡支店', '121': '秋田支店', 
     '131': '仙台支店', '141': '山形支店', '142': '酒田営業所', '151': '郡山支店', '153': '福島支店', 
     '201': '新潟支店', '202': '長岡支店', '203': '上越営業所', '211': '長野支店', '212': '松本支店', 
@@ -14,19 +14,32 @@ const BRANCH_MAP = {
     '802': '鹿児島支店',
 };
 
-// 💡 初期データ
+// ✅ エラー修正: 定数 'INITIAL_EMPTY_DATA' の定義を追加
 const INITIAL_EMPTY_DATA = {
     isPrinted: false,
     isPDFGenerated: false,
-    branchName: '', 
+    branchName: '',
     propertyNo: '',
     propertyName: '',
     propertyLocation: '',
     constructionDate: '',
-    builderName: '', // CSV連携後の初期値
+    builderName: '',
 };
 
 // --- ユーティリティ関数 ---
+
+/**
+ * 支店コードを3桁に正規化する関数（1桁でも受け付ける）
+ * @param {string | number} code - ユーザー入力の支店コード
+ * @returns {string | null} 3桁に正規化されたコード、または無効な場合は null
+ */
+const normalizeBranchCode = (code) => {
+    const s = String(code).trim();
+    // 1桁から3桁の数字のみを許可
+    if (!/^\d{1,3}$/.test(s)) return null; 
+    // 3桁に満たない場合は先頭を0で埋める
+    return s.padStart(3, '0');
+};
 
 const formatConstructionDate = (dateString) => {
     if (!dateString) return '';
@@ -50,7 +63,8 @@ const getFormattedToday = () => {
     return `${year}年${month}月${day}日`;
 };
 
-const parseCSV = (text) => {
+// 💡 branchMap を引数で受け取るように変更
+const parseCSV = (text, branchMap) => { 
     const lines = text.trim().split('\n');
     if (lines.length < 2) return [];
 
@@ -104,7 +118,8 @@ const parseCSV = (text) => {
 
         if (values.length > maxIndex) {
             
-            const branchCode = values[colMap['支店コード']].trim();
+            const rawBranchCode = values[colMap['支店コード']].trim();
+            const branchCode = normalizeBranchCode(rawBranchCode) || rawBranchCode; // 1桁コードを正規化
             const propertyNo = values[colMap['受注№']].trim();
             const rawPropertyName = values[propertyNameIndex].replace(/"/g, '').trim();
             const rawBuilderName = values[BUILDER_NAME_COLUMN_INDEX].replace(/"/g, '').trim();
@@ -121,7 +136,8 @@ const parseCSV = (text) => {
             data.push({
                 isPrinted: false,
                 isPDFGenerated: false,
-                branchName: BRANCH_MAP[branchCode] || `支店コード:${branchCode} (未登録)`,
+                // 💡 branchMap を使用
+                branchName: branchMap[branchCode] || `支店コード:${branchCode} (未登録)`,
                 propertyNo: propertyNo,
                 
                 // 物件名の「様」自動追記ロジックは残しておく (D列の値を使用)
@@ -265,7 +281,8 @@ export default function CertificateApp() {
             const stored = localStorage.getItem(key);
             if (stored) {
                 try {
-                    if (key === 'csvDataList') return JSON.parse(stored);
+                    // branchMap も JSON.parse で処理
+                    if (key === 'csvDataList' || key === 'branchMap') return JSON.parse(stored);
                     if (key !== 'backPageListText') return stored; 
                 } catch {
                     return stored;
@@ -275,6 +292,10 @@ export default function CertificateApp() {
         return typeof defaultValue === 'function' ? defaultValue() : defaultValue;
     };
 
+    // 🏆 新規: 支店マップの状態
+    const [branchMap, setBranchMap] = useState(() => getStoredValue('branchMap', () => BRANCH_MAP_INITIAL));
+    const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+    
     // 🏆 メインアプリロック状態
     const [isAppLocked, setIsAppLocked] = useState(true); 
     const [mainKeyInput, setMainKeyInput] = useState('');
@@ -295,6 +316,7 @@ export default function CertificateApp() {
             const saved = initialList.find(d => d.propertyNo === lastPropertyNo);
             return saved || initialList[0];
         }
+        // ✅ エラー修正箇所: 定数 INITIAL_EMPTY_DATA を使用
         return INITIAL_EMPTY_DATA;
     });
 
@@ -330,12 +352,11 @@ export default function CertificateApp() {
         localStorage.setItem('sealImage', sealImage);
         // 🏆 新規追加: ロゴ画像の永続化
         localStorage.setItem('logoImage', logoImage); 
-        // 🚀 修正: issuanceDateの永続化を削除 - 常に当日が設定されるようにする
-        // localStorage.setItem('issuanceDate', issuanceDate); 
+        // 💡 新規: 支店マップの永続化
+        localStorage.setItem('branchMap', JSON.stringify(branchMap));
         localStorage.setItem('constructionStore', constructionStore);
-        // 💡 修正: builderNameの個別保存を削除 (currentDataの一部として保存される)
         localStorage.setItem('backPageListText', backPageListText);
-    }, [qrImage, sealImage, logoImage, constructionStore, backPageListText]); // issuanceDateを依存配列から削除
+    }, [qrImage, sealImage, logoImage, branchMap, constructionStore, backPageListText]); // branchMapを依存配列に追加
 
     useEffect(() => {
         localStorage.setItem('csvDataList', JSON.stringify(csvDataList));
@@ -345,9 +366,11 @@ export default function CertificateApp() {
             // NOTE: バッチ印刷中のsetCurrentDataはuseEffectが担当するため、ここではリスト更新時のみ処理
             if (!isBatchPrinting) {
                 // builderNameを含んだデータで初期化
+                // ✅ エラー修正箇所: 定数 INITIAL_EMPTY_DATA を使用
                 setCurrentData(saved || csvDataList[0]);
             }
         } else {
+            // ✅ エラー修正箇所: 定数 INITIAL_EMPTY_DATA を使用
             setCurrentData(INITIAL_EMPTY_DATA);
             localStorage.removeItem('lastSelectedPropertyNo');
         }
@@ -363,7 +386,10 @@ export default function CertificateApp() {
     useEffect(() => {
         if (currentData && currentData.branchName) {
             if (!localStorage.getItem('constructionStore_manual_override')) {
-                setConstructionStore(currentData.branchName);
+                // 支店名が「(未登録)」の場合は、自動反映しないようにする
+                if (!currentData.branchName.includes('(未登録)')) {
+                    setConstructionStore(currentData.branchName);
+                }
             }
         }
     }, [currentData]);
@@ -403,6 +429,7 @@ export default function CertificateApp() {
             } else if (csvDataList.length > 0) {
                 setCurrentData(csvDataList[0]);
             } else {
+                // ✅ エラー修正箇所: 定数 INITIAL_EMPTY_DATA を使用
                 setCurrentData(INITIAL_EMPTY_DATA);
             }
             
@@ -423,8 +450,11 @@ export default function CertificateApp() {
             
             // 1. 印刷対象のデータを設定 (DOM更新をトリガー)
             setCurrentData(dataToPrint);
-            setConstructionStore(dataToPrint.branchName);
-            localStorage.removeItem('constructionStore_manual_override'); // 一括印刷時は強制的に上書き
+            // 支店名が「(未登録)」の場合は、施工店名に反映させない
+            if (!dataToPrint.branchName.includes('(未登録)')) {
+                setConstructionStore(dataToPrint.branchName);
+                localStorage.removeItem('constructionStore_manual_override'); // 一括印刷時は強制的に上書き
+            }
 
             // 2. DOMの更新完了を待ってからprint()を呼ぶためにsetTimeoutで遅延させる
             const printTimer = setTimeout(() => {
@@ -489,15 +519,19 @@ export default function CertificateApp() {
         const reader = new FileReader();
         reader.onload = (e) => {
             const text = e.target.result;
-            const parsed = parseCSV(text);
+            // 💡 branchMap を渡して解析
+            const parsed = parseCSV(text, branchMap); 
             setCsvDataList(parsed);
 
             if (parsed.length > 0) {
                 setCurrentData(parsed[0]);
-                setConstructionStore(parsed[0].branchName);
-                localStorage.removeItem('constructionStore_manual_override');
+                if (!parsed[0].branchName.includes('(未登録)')) {
+                    setConstructionStore(parsed[0].branchName);
+                    localStorage.removeItem('constructionStore_manual_override');
+                }
                 alert(`${parsed.length}件の有効な物件データを読み込みました。`);
             } else {
+                // ✅ エラー修正箇所: 定数 INITIAL_EMPTY_DATA を使用
                 setCurrentData(INITIAL_EMPTY_DATA);
                 setConstructionStore('');
                 alert("有効な物件データが見つかりませんでした。");
@@ -517,6 +551,7 @@ export default function CertificateApp() {
 
         if (window.confirm(`${csvDataList.length}件の物件データを削除しますか？`)) {
             setCsvDataList([]);
+            // ✅ エラー修正箇所: 定数 INITIAL_EMPTY_DATA を使用
             setCurrentData(INITIAL_EMPTY_DATA);
             setConstructionStore('');
             // 💡 修正: builderNameのローカルストレージ削除を削除
@@ -653,25 +688,16 @@ export default function CertificateApp() {
 
     const ImageUploadBox = ({ title, image, setImageState, fileInputRef, placeholderText, boxClassName, imgClassName }) => (
         <div className="flex flex-col items-center print:block print:w-auto">
-            {/* 🏆 修正1: title (ロゴ画像/会社印) の <strong> タグを削除 
-               QRコードエリアで使用する場合のみ、このtitleが残るように調整します。
-               【今回の修正】: print-hidden を削除し、QRコードタイトルを印刷時に表示する
-            */}
             {title && <strong className="text-blue-800 text-sm print:text-xs">{title}</strong>}
             
             <div
-                // 🏆 修正2: 画像がない場合、ロゴ/会社印（title === ''）のときのみ print-hidden
                 className={`w-32 h-32 border-2 border-dashed border-blue-400 bg-white shadow-inner cursor-pointer flex items-center justify-center m-2 overflow-hidden print:border-none print:shadow-none print:m-0 print:p-0 ${boxClassName} ${!image && title === '' ? 'print-hidden' : ''}`}
                 onClick={() => fileInputRef.current.click()}
-                // 💡 印刷時の枠線・背景設定を統一
                 style={image ? { printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact', backgroundColor: 'white' } : {}}
             >
                 {image ? (
                     <img src={image} alt={title} className={`object-contain ${imgClassName}`} />
                 ) : (
-                    /* 🏆 修正3: 画像がない場合、アイコンと「画像を挿入」プロンプトを表示。
-                       QRコードエリアのようにplaceholderTextがある場合は、それも表示する。
-                    */
                     <div className="text-center text-xs text-gray-400 p-2 print:text-[10px] print:text-gray-700 print-hidden"> 
                         <Upload className="w-5 h-5 mx-auto mb-1 print:w-4 print:h-4" />
                         <p>画像を挿入</p> 
@@ -798,6 +824,146 @@ export default function CertificateApp() {
         );
     };
 
+    // --- 🏆 新規: 支店マップ管理モーダルコンポーネント ---
+
+    const BranchMapModal = () => {
+        const [tempCode, setTempCode] = useState('');
+        const [tempName, setTempName] = useState('');
+        const [error, setError] = useState('');
+
+        const branches = Object.entries(branchMap).sort(([codeA], [codeB]) => codeA.localeCompare(codeB));
+
+        const handleAddOrUpdate = () => {
+            setError('');
+            const normalizedCode = normalizeBranchCode(tempCode);
+            
+            if (!normalizedCode) {
+                setError('支店コードは1〜3桁の半角数字で入力してください。');
+                return;
+            }
+            if (!tempName.trim()) {
+                setError('支店名を入力してください。');
+                return;
+            }
+
+            setBranchMap(prevMap => ({
+                ...prevMap,
+                [normalizedCode]: tempName.trim(),
+            }));
+
+            setTempCode('');
+            setTempName('');
+        };
+
+        const handleDelete = (code) => {
+            if (window.confirm(`支店コード ${code} (${branchMap[code]}) を削除しますか？`)) {
+                setBranchMap(prevMap => {
+                    const newMap = { ...prevMap };
+                    delete newMap[code];
+                    return newMap;
+                });
+            }
+        };
+
+        const handleEditClick = (code, name) => {
+            // 表示のために、3桁コードの先頭の0を削除（例: 001 -> 1）
+            const displayCode = code.replace(/^0+/, '') || '0';
+            setTempCode(displayCode);
+            setTempName(name);
+            setError('');
+        };
+
+
+        if (!isBranchModalOpen) return null;
+
+        return (
+            <div className="fixed inset-0 z-[100] bg-black bg-opacity-50 flex justify-center items-center print-hidden">
+                <div className="bg-white p-6 rounded-lg shadow-2xl w-full max-w-2xl mx-4">
+                    <div className="flex justify-between items-center border-b pb-3 mb-4">
+                        <h2 className="text-xl font-bold text-blue-600 flex items-center">
+                            <Settings className="w-5 h-5 mr-2" />
+                            支店コード マッピング管理
+                        </h2>
+                        <button onClick={() => setIsBranchModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    <p className="text-sm text-gray-600 mb-4">
+                        CSVの「支店コード」と「支店名」の対応を管理します。コードは**1桁から3桁の数字**で入力可能です (例: `1` -> `001`として登録)。
+                    </p>
+                    
+                    {error && <p className="text-sm text-red-500 mb-3 font-semibold border border-red-300 p-2 rounded-md">{error}</p>}
+
+
+                    {/* 追加・編集フォーム */}
+                    <div className="flex items-center space-x-3 mb-4 p-3 border border-blue-200 rounded-md bg-blue-50">
+                        <input
+                            type="text"
+                            value={tempCode}
+                            onChange={(e) => setTempCode(e.target.value)}
+                            placeholder="コード (例: 1, 101)"
+                            className="w-24 p-2 border border-gray-300 rounded text-center text-sm"
+                            maxLength={3}
+                        />
+                        <input
+                            type="text"
+                            value={tempName}
+                            onChange={(e) => setTempName(e.target.value)}
+                            placeholder="支店名 (例: 札幌支店)"
+                            className="flex-1 p-2 border border-gray-300 rounded text-sm"
+                        />
+                        <button onClick={handleAddOrUpdate} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm">
+                            {branches.some(([code]) => code === normalizeBranchCode(tempCode)) ? '更新' : '追加'}
+                        </button>
+                    </div>
+
+                    {/* リスト表示 */}
+                    <div className="max-h-80 overflow-y-auto border border-gray-300 rounded-md">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">コード</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">支店名</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200 text-sm">
+                                {branches.map(([code, name]) => (
+                                    <tr key={code} className='hover:bg-gray-50'>
+                                        <td className="px-6 py-2 whitespace-nowrap font-mono text-center">{code}</td>
+                                        <td className="px-6 py-2 whitespace-nowrap">{name}</td>
+                                        <td className="px-6 py-2 whitespace-nowrap text-right">
+                                            <button 
+                                                onClick={() => handleEditClick(code, name)}
+                                                className="text-indigo-600 hover:text-indigo-900 mr-3 p-1 rounded-full hover:bg-indigo-100 transition"
+                                                title="編集"
+                                            >
+                                                <Edit className="w-4 h-4"/>
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDelete(code)}
+                                                className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-100 transition"
+                                                title="削除"
+                                            >
+                                                <Trash2 className="w-4 h-4"/>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="flex justify-end mt-6">
+                        <button onClick={() => setIsBranchModalOpen(false)} className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">閉じる</button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+
     // --- メインレンダリング ---
     return (
         <div className="bg-gray-100 p-4 min-h-screen print:bg-white print:p-0 print:m-0 print:min-h-0 flex">
@@ -838,6 +1004,7 @@ export default function CertificateApp() {
             {!isAppLocked && (
                 <>
                     <ManualEditModal />
+                    <BranchMapModal /> {/* 💡 支店コード管理モーダルを追加 */}
 
                     {/* 印刷用CSSスタイル */}
                     <style>
@@ -889,7 +1056,16 @@ export default function CertificateApp() {
                         <h2 className="text-xl font-bold text-blue-800 mb-4 flex items-center">
                             <List className="w-6 h-6 mr-2"/> 物件データ管理
                         </h2>
-
+                        
+                        {/* 💡 支店コード管理ボタン */}
+                        <button
+                            onClick={() => setIsBranchModalOpen(true)}
+                            className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200 mb-4"
+                        >
+                            <Settings className="w-5 h-5" />
+                            <span>支店コード マッピング管理</span>
+                        </button>
+                        
                         <button
                             onClick={openModal}
                             className="flex items-center justify-center space-x-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200 mb-4"
@@ -1288,8 +1464,8 @@ export default function CertificateApp() {
 
                             <h2 className="text-xl font-extrabold mb-4 text-center tracking-wider text-red-800 print:text-lg">免 責 事 項</h2>
                             
-                            <p className="text-sm font-bold mb-4 border-b pb-2 border-red-200 print:text-xs print:mb-2">\
-                                以下のいずれかに該当する場合には、保証は適用されません。\
+                            <p className="text-sm font-bold mb-4 border-b pb-2 border-red-200 print:text-xs print:mb-2">
+                                以下のいずれかに該当する場合には、保証は適用されません。
                             </p>
                             
                             {renderBackPageList(backPageListText)}
