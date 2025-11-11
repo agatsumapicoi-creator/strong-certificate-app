@@ -432,7 +432,7 @@ export default function CertificateApp() {
 
             return () => clearTimeout(printTimer);
         }
-    }, [batchPrintIndex, isBatchPrinting, csvDataList]); // 依存関係は必要なもののみ
+    }, [batchPrintIndex, isBatchPrinting, csvDataList, updatePropertyStatus]); // ⚠️ 修正箇所: updatePropertyStatusを追加
 
     // 🏆 新規: メインアプリのロック解除ハンドラ
     const handleMainUnlock = () => {
@@ -682,7 +682,7 @@ export default function CertificateApp() {
         </div>
     );
 
-    // 🏆 免責事項リストのレンダリング関数 (中略: 変更なし)
+    // 🏆 免責事項リストのレンダリング関数
     const renderBackPageList = (text) => {
         const items = text.split('\n').filter(line => line.trim() !== '');
         
@@ -691,7 +691,7 @@ export default function CertificateApp() {
         
         items.forEach(line => {
             // 1) または 1）で始まる行を検出
-            const match = line.match(/^(\d+)\s*[）\)]\s*(.*)/); 
+            const match = line.match(/^(\d+)\s*[）)]\s*(.*)/); // ⚠️ 修正箇所: \を削除
             // 例：で始まる行を検出
             const isExample = line.trim().startsWith('例：'); 
             
