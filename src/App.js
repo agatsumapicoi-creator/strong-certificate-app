@@ -162,10 +162,10 @@ const parseCSV = (text, branchMap) => {
 // --- 裏面リストの初期値定義 ---
 const initialBackContent = `1） ヤマトシロアリまたはイエシロアリ以外の害虫（キクイムシ、シンクイムシ等）動物、植物に起因する被害が発生した場合。
 
-2） ICOSA strong systemを行い、床下・玄関内土間、勝手土間以外からのシロアリ侵入・喰害による被害の場合。
+2） PICOSAセキュリティーシステムを行い、床下・玄関内土間、勝手土間以外からのシロアリ侵入・喰害による被害の場合。
 例：基礎外側から蟻道等をつくり換気口や水切部から侵入する場合。土中からの侵入でなく飛来して木部に被害をもたらした場合。屋外デッキを通じてシロアリ被害が生じた場合。
 
-3） 対象建物又は、ICOSA strong system が施工された部位が水害による被害を受けた場合。
+3） 対象建物又は、PICOSAセキュリティーシステム が施工された部位が水害による被害を受けた場合。
 
 4） 地震・津波・台風・火災その他の災害に起因する場合。
 例：地震によるコンクリートのクラック
@@ -181,7 +181,7 @@ const initialBackContent = `1） ヤマトシロアリまたはイエシロア�
 
 9） 理由の如何を問わず、保証書申請時の内容と異なる記載、保険規定に反する事実があったことが判明した場合。
 
-10） 対象建築物に増築又は改築がなされた場合。ただし、増築又は改築部分に、弊社が認める方法によりICOSA strong system が施工された場合にはこの限りではない。
+10） 対象建築物に増築又は改築がなされた場合。ただし、増築又は改築部分に、弊社が認める方法によりPICOSAセキュリティーシステム が施工された場合にはこの限りではない。
 
 11） 本保証書「6.ご連絡のお願い」でお願いしているご連絡がなされなかった場合。
 
@@ -1231,13 +1231,13 @@ export default function CertificateApp() {
                             <div className="text-center pb-4 border-b-2 border-blue-800 mb-4 print:mb-3 print:pb-3">
                                 {/* タイトルは「保証書」 */}
                                 <h1 className="text-3xl font-extrabold mb-1 tracking-widest text-gray-800 print:text-2xl print:mb-0">保 証 書</h1> 
-                                <p className="text-sm text-gray-600 print:text-xs">株式会社ピコイ　新築防蟻工事</p>
+                                <p className="text-sm text-gray-600 print:text-xs">株式会社ピコイ 新築防蟻工事</p>
                                 
                                 <div 
                                     className="inline-block bg-gradient-to-r from-blue-700 to-blue-500 text-white px-8 py-2 mt-3 rounded-xl text-xl font-bold tracking-wider shadow-lg print:text-lg print:px-6 print:py-1 print:mt-2"
                                     style={{ fontFamily: "'Helvetica Neue LT Pro', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}
                                 >
-                                    ICOSA strong system
+                                    PICOSAセキュリティーシステム
                                 </div>
                                 
                                 <div className="inline-block bg-yellow-600 text-white text-sm font-bold px-4 py-1 mt-3 rounded-full print:text-xs print:mt-1 print:px-3">
@@ -1247,7 +1247,7 @@ export default function CertificateApp() {
 
                             <div className="text-center text-sm mb-4 leading-snug print:text-xs print:mb-3">
                                 このたび、お客様の大切なお住まいにおいて、株式会社ピコイが<br />
-                                「<strong className="text-blue-700">ICOSA strong system</strong>」に基づく新築防蟻工事を実施いたしましたことを証明いたします。<br />
+                                「<strong className="text-blue-700">PICOSAセキュリティーシステム</strong>」に基づく新築防蟻工事を実施いたしましたことを証明いたします。<br />
                                 併せて、本工事は<strong className="text-red-600">20年間の保証対象</strong>となりますことをここに明記いたします。
                             </div>
 
@@ -1281,7 +1281,7 @@ export default function CertificateApp() {
                                     <span className="mr-2 text-xl leading-none print:text-lg">■</span> 施工内容
                                 </h2>
                                 <FieldRow label="工事項目" value="新築防蟻工事" />
-                                <FieldRow label="工法" value="ICOSA strong system" />
+                                <FieldRow label="工法" value="PICOSAセキュリティーシステム" />
                                 <FieldRow 
                                     label="施工日" 
                                     value={currentData.constructionDate || '（手動編集ボタンで入力してください）'} 
